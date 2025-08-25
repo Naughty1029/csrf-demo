@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/index.ts",
-    "trap": "nodemon src/trap.ts",
-    "dev2": "nodemon src/index.ts",
-    "trap2": "nodemon src/trap.ts",
+    "dev": "nodemon src/secure/index.ts",
+    "trap": "nodemon src/secure/trap.ts",
+    "dev2": "nodemon src/vulnerable/index.ts",
+    "trap2": "nodemon src/vulnerable/trap.ts",
+    "running": "concurrently \"npm run dev\" \"npm run trap\"",
     "running2": "concurrently \"npm run dev2\" \"npm run trap2\"",
+    "running3": "concurrently \"npm run running\" \"npm run running2\"",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
