@@ -2,6 +2,7 @@
   import session from 'express-session';
   import bodyParser from 'body-parser';
   import FileStore from 'session-file-store';
+  import crypto from 'crypto';
 
   // セッションの型定義を拡張
   declare module 'express-session' {
@@ -9,6 +10,7 @@
       user?: string;
       email?: string;
       comment?: string;
+      csrfToken?: string;
     }
   }
 
@@ -32,6 +34,30 @@
 
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(express.static('public'));
+
+
+  // CSRFトークンを生成
+  function generateCSRFToken() {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  // CSRFトークンをセッションに保存
+  app.use((req, res, next) => {
+    if (!req.session.csrfToken) {
+      req.session.csrfToken = generateCSRFToken();
+    }
+    next();
+  });
+
+  // CSRFトークンを検証(ミドルウェア)
+  function verifyCSRFToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+    console.log(req.session.csrfToken, req.body.csrfToken);
+    if (req.session.csrfToken !== req.body.csrfToken) {
+      res.status(403).send('CSRFトークンが無効です');
+    } else {
+      next();
+    }
+  }
 
   function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (req.session.user) {
@@ -85,6 +111,8 @@
       <div style="border: 2px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 8px;">
         <h3>✏️ プロフィール更新</h3>
         <form action="/update-profile" method="post">
+          <!-- CSRFトークンを隠しフィールドに追加 -->
+          <input type="hidden" name="csrfToken" value="${req.session.csrfToken}" />
           <input type="text" name="email" placeholder="メールアドレス" required style="width: 100%; padding: 10px; margin: 5px 0;" />
           <button type="submit" style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">プロフィールを更新</button>
         </form>
@@ -94,6 +122,8 @@
       <div style="border: 2px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 8px;">
         <h3>💭 コメント投稿</h3>
         <form action="/post-comment" method="post">
+          <!-- CSRFトークンを隠しフィールドに追加 -->
+          <input type="hidden" name="csrfToken" value="${req.session.csrfToken}" />
           <textarea name="comment" placeholder="コメントを入力" required style="width: 100%; padding: 10px; margin: 5px 0; height: 80px;"></textarea>
           <button type="submit" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">コメントする</button>
         </form>
@@ -109,16 +139,16 @@
     `);
   });
 
-  // プロフィール更新処理（脆弱性あり）
-  app.post('/update-profile', requireAuth, (req, res) => {
+  // プロフィール更新処理（CSRFトークンを検証）
+  app.post('/update-profile', requireAuth, verifyCSRFToken, (req, res) => {
     const { email } = req.body;
     req.session.email = email; // セッションに保存
     console.log(`${req.session.user}のメールアドレスを${email}に更新しました`);
     res.send(`プロフィールが更新されました。<a href="/profile">プロフィール画面に戻る</a>`);
   });
 
-  // コメント投稿処理（脆弱性あり）
-  app.post('/post-comment', requireAuth, (req, res) => {
+  // コメント投稿処理（CSRFトークンを検証）
+  app.post('/post-comment', requireAuth, verifyCSRFToken, (req, res) => {
     const { comment } = req.body;
     req.session.comment = comment; // セッションに保存
     console.log(`${req.session.user}がコメントしました: ${comment}`);
